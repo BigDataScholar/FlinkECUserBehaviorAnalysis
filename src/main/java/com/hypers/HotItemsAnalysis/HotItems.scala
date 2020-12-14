@@ -19,7 +19,7 @@ import scala.collection.mutable.ListBuffer
 /*
  * @Author: Alice菌
  * @Date: 2020/11/23 10:38
- * @Description: 
+ * @Description:
       电商用户行为数据分析： 热门商品实时统计
       <  每隔5分钟输出最近一小时内点击量最多的前N个商品   >
  */
