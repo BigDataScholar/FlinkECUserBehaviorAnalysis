@@ -1,0 +1,2 @@
+# FlinkECUserBehaviorAnalysis
+通过观看尚硅谷的Flink实战视频，开了一个仓库，记录源码和一些所需要的数据文件，也欢迎大家积极讨论
