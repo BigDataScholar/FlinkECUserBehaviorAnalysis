@@ -2,7 +2,6 @@ package com.hypers.LoginFailDetect
 
 import java.util
 
-import com.hypers.LoginFailDetect.LoginFailOne.LoginEvent
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction
