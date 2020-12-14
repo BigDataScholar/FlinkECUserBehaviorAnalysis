@@ -42,7 +42,7 @@ object OrderTimeoutWithOutCep {
       })  //  设置时间戳
 
     // 1、 定义一个匹配事件序列的模式
-    val orderPayPattern = Pattern
+    val orderPayPattern: Pattern[OrderEvent, OrderEvent] = Pattern
       .begin[OrderEvent]("create").where(_.eventType == "create")   // 首先是订单的 create 事件
       .followedBy("pay").where(_.eventType == "pay")  // 后面来的是订单的 pay 事件
       .within(Time.minutes(15))    // 间隔 15 分钟

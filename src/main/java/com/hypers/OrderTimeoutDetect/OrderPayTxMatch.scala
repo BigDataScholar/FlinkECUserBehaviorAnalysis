@@ -93,7 +93,7 @@ object OrderPayTxMatch {
     }
 
     override def processElement2(receipt: ReceiptEvent, ctx: CoProcessFunction[OrderEvent, ReceiptEvent, (OrderEvent, ReceiptEvent)]#Context, out: Collector[(OrderEvent, ReceiptEvent)]): Unit = {
-      //receipt来了，考察有没有对应的pay来过
+      //receipt来了，判断有没有对应的pay来过
       val pay: OrderEvent = payState.value()
       if (pay != null) {
         //如果已经有pay，那么正常匹配，输出到主流

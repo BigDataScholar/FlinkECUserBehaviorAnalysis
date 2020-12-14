@@ -64,7 +64,7 @@ object OrderTimeout {
     lazy val timerTsState:ValueState[Long] = getRuntimeContext.getState(new ValueStateDescriptor[Long]("timer-ts", classOf[Long]))
 
     // 定义一个侧输出流
-    val orderTimeOutputTag = new OutputTag[OrderResult]("timeout")
+    val orderTimeOutputTag: OutputTag[OrderResult] = new OutputTag[OrderResult]("timeout")
 
     override def processElement(value: OrderEvent, ctx: KeyedProcessFunction[Long, OrderEvent, OrderResult]#Context, out: Collector[OrderResult]): Unit = {
 
