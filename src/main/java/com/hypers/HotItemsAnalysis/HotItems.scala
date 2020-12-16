@@ -2,7 +2,6 @@ package com.hypers.HotItemsAnalysis
 
 import java.sql.Timestamp
 
-import com.hypers.HotItemsAnalysis.HotItems.{ItemViewCount, UserBehavior}
 import org.apache.flink.api.common.functions.AggregateFunction
 import org.apache.flink.api.common.state.{ListState, ListStateDescriptor}
 import org.apache.flink.configuration.Configuration
@@ -48,7 +47,7 @@ object HotItems {
     })
       // 设置waterMark(水印)  --  处理乱序数据
       .assignAscendingTimestamps(_.timeStamp * 1000)
-      // 过滤出 “pv”的数据  -- 过滤出点击行为数据
+      // 过滤出 “pv” 的数据  -- 过滤出点击行为数据
       .filter(_.behavior == "pv")
       // 因为需要统计出每种商品的个数,这里先对商品id进行分组
       .keyBy(_.itemId)
@@ -61,109 +60,111 @@ object HotItems {
       // 输出每个窗口中点击量前N名的商品
       .process(new TopNHotItems(3))
       .print("HotItems")
-
+    
     // 执行程序
     env.execute("HotItems")
 
   }
-}
 
-// 自定义预聚合函数，来一个数据就加一
-class CountAgg() extends AggregateFunction[UserBehavior,Long,Long]{
+  // 自定义预聚合函数，来一个数据就加一
+  class CountAgg() extends AggregateFunction[UserBehavior,Long,Long]{
 
-  // 定义累加器的初始值
-  override def createAccumulator(): Long = 0L
+    // 定义累加器的初始值
+    override def createAccumulator(): Long = 0L
 
-  // 定义累加规则
-  override def add(value: UserBehavior, accumulator: Long): Long = accumulator + 1
+    // 定义累加规则
+    override def add(value: UserBehavior, accumulator: Long): Long = accumulator + 1
 
-  // 定义得到的结果
-  override def getResult(accumulator: Long): Long = accumulator
+    // 定义得到的结果
+    override def getResult(accumulator: Long): Long = accumulator
 
-  // 合并的规则
-  override def merge(a: Long, b: Long): Long = a + b
+    // 合并的规则
+    override def merge(a: Long, b: Long): Long = a + b
 
-}
-
-/**
-  * WindowFunction [输入参数类型，输出参数类型，Key值类型，窗口类型]
-  * 来处理窗口中的每一个元素(可能是分组的)
-  */
-// 自定义窗口函数，包装成 ItemViewCount输出
-class WindowResult() extends WindowFunction[Long,ItemViewCount,Long,TimeWindow] {
-
-  override def apply(key: Long, window: TimeWindow, input: Iterable[Long], out: Collector[ItemViewCount]): Unit = {
-
-    // 在前面的步骤中，我们根据商品 id 进行了分组，次数的key就是  商品编号
-    val itemId: Long = key
-    // 获取 窗口 末尾
-    val windowEnd: Long = window.getEnd
-    // 获取点击数大小 【累加器统计的结果】
-    val count: Long = input.iterator.next()
-
-    // 将获取到的结果进行上传
-    out.collect(ItemViewCount(itemId,windowEnd,count))
-  }
-}
-
-// 自定义 process function，排序处理数据
-class TopNHotItems(nSize:Int) extends KeyedProcessFunction[Long,ItemViewCount,String] {
-
-  // 定义一个状态变量 list state，用来保存所有的 ItemViewCont
-  private var itemState: ListState[ItemViewCount] = _
-
-  // 在执行processElement方法之前，会最先执行并且只执行一次 open 方法
-  override def open(parameters: Configuration): Unit = {
-    // 初始化状态变量
-    itemState = getRuntimeContext.getListState(new ListStateDescriptor[ItemViewCount]("itemState", classOf[ItemViewCount]))
   }
 
-  // 每个元素都会执行这个方法
-  override def processElement(value: ItemViewCount, ctx: KeyedProcessFunction[Long, ItemViewCount, String]#Context, collector: Collector[String]): Unit = {
-    // 每一条数据都存入 state 中
-    itemState.add(value)
-    // 注册 windowEnd+1 的 EventTime Timer, 延迟触发，当触发时，说明收齐了属于windowEnd窗口的所有商品数据，统一排序处理
-    ctx.timerService().registerEventTimeTimer(value.windowEnd + 100)
+  /**
+   * WindowFunction [输入参数类型，输出参数类型，Key值类型，窗口类型]
+   * 来处理窗口中的每一个元素(可能是分组的)
+   */
+  // 自定义窗口函数，包装成 ItemViewCount输出
+  class WindowResult() extends WindowFunction[Long,ItemViewCount,Long,TimeWindow] {
+
+    override def apply(key: Long, window: TimeWindow, input: Iterable[Long], out: Collector[ItemViewCount]): Unit = {
+
+      // 在前面的步骤中，我们根据商品 id 进行了分组，次数的 「 key 」 就是  商品编号
+      val itemId: Long = key
+      // 获取 窗口 末尾
+      val windowEnd: Long = window.getEnd
+      // 获取点击数大小 【累加器统计的结果】
+      val count: Long = input.iterator.next()
+
+      // 将获取到的结果进行上传
+      out.collect(ItemViewCount(itemId,windowEnd,count))
+    }
   }
 
-  // 定时器触发时，会执行 onTimer 任务
-  override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[Long, ItemViewCount, String]#OnTimerContext, out: Collector[String]): Unit = {
+  // 自定义 process function，排序处理数据
+  class TopNHotItems(nSize:Int) extends KeyedProcessFunction[Long,ItemViewCount,String] {
 
-    // 已经收集到所有的数据，首先把所有的数据放到一个 List 中
-    val allItems: ListBuffer[ItemViewCount] = new ListBuffer()
+    // 定义一个状态变量 list state，用来保存所有的 ItemViewCont
+    private var itemState: ListState[ItemViewCount] = _
 
-    import scala.collection.JavaConversions._
-
-    for (item <- itemState.get()) {
-      allItems += item
+    // 在执行processElement方法之前，会最先执行并且只执行一次 open 方法
+    override def open(parameters: Configuration): Unit = {
+      // 初始化状态变量
+      itemState = getRuntimeContext.getListState(new ListStateDescriptor[ItemViewCount]("itemState", classOf[ItemViewCount]))
     }
 
-    // 将状态清除
-    itemState.clear()
+    // 每个元素都会执行这个方法
+    override def processElement(value: ItemViewCount, ctx: KeyedProcessFunction[Long, ItemViewCount, String]#Context, collector: Collector[String]): Unit = {
+      // 每一条数据都存入 state 中
+      itemState.add(value)
+      // 注册 windowEnd+1 的 EventTime Timer, 延迟触发，当触发时，说明收齐了属于windowEnd窗口的所有商品数据，统一排序处理
+      ctx.timerService().registerEventTimeTimer(value.windowEnd + 100)
+    }
 
-    // 按照 count 大小  倒序排序
-    val sortedItems: ListBuffer[ItemViewCount] = allItems.sortBy(_.count)(Ordering.Long.reverse).take(nSize)
+    // 定时器触发时，会执行 onTimer 任务
+    override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[Long, ItemViewCount, String]#OnTimerContext, out: Collector[String]): Unit = {
 
-    // 将数据排名信息格式化成 String，方便打印输出
-    val result: StringBuilder = new StringBuilder()
-    result.append("======================================================\n")
-    // 触发定时器时，我们多设置了0.1秒的延迟，这里我们将时间减去0.1获取到最精确的时间
-    result.append("时间：").append(new Timestamp(timestamp - 100)).append("\n")
+      // 已经收集到所有的数据，首先把所有的数据放到一个 List 中
+      val allItems: ListBuffer[ItemViewCount] = new ListBuffer()
 
-    // 每一个商品信息输出 (indices方法获取索引)
-    for( i <- sortedItems.indices){
-         val currentTtem: ItemViewCount = sortedItems(i)
-         result.append("No").append(i + 1).append(":")
+      import scala.collection.JavaConversions._
+
+      for (item <- itemState.get()) {
+        allItems += item
+      }
+
+      // 将状态清除
+      itemState.clear()
+
+      // 按照 count 大小  倒序排序
+      val sortedItems: ListBuffer[ItemViewCount] = allItems.sortBy(_.count)(Ordering.Long.reverse).take(nSize)
+
+      // 将数据排名信息格式化成 String，方便打印输出
+      val result: StringBuilder = new StringBuilder()
+      result.append("======================================================\n")
+      // 触发定时器时，我们多设置了0.1秒的延迟，这里我们将时间减去0.1获取到最精确的时间
+      result.append("时间：").append(new Timestamp(timestamp - 100)).append("\n")
+
+      // 每一个商品信息输出 (indices方法获取索引)
+      for( i <- sortedItems.indices){
+        val currentTtem: ItemViewCount = sortedItems(i)
+        result.append("No").append(i + 1).append(":")
           .append("商品ID=").append(currentTtem.itemId).append("  ")
           .append("浏览量=").append(currentTtem.count).append("  ")
           .append("\n")
+      }
+
+      result.append("======================================================\n")
+
+      // 设置休眠时间
+      Thread.sleep(1000)
+      // 收集数据
+      out.collect(result.toString())
     }
-
-    result.append("======================================================\n")
-
-    // 设置休眠时间
-    Thread.sleep(1000)
-    // 收集数据
-    out.collect(result.toString())
   }
+
 }
+
